@@ -435,7 +435,7 @@ check <- which(temp$VCL6 != 0 | temp$VCL9 != 0 | temp$VCL12 != 0)
 ### subset to the six science related items
 dat <- raw[-check, c(1, 2, 6, 13, 22, 23)]
 
-### Graded vs. GPCM
+### graded vs. gpcm
 graded <- mirt(dat, model = 1, itemtype = "graded", SE = TRUE,
   technical = list(NCYCLES = 20000), verbose = FALSE)
 gpcm <- mirt(dat, model = 1, itemtype = "gpcm", SE = TRUE,
@@ -444,7 +444,7 @@ extract.mirt(graded, "AIC")
 extract.mirt(gpcm, "AIC")
 vuongtest(graded, gpcm, nested = FALSE)
 
-### 1d-Graded vs. 2d-Graded
+### 1d-graded vs. 2d-graded
 graded2 <- mirt(dat, model = 2, itemtype = "graded", SE = TRUE,
   technical = list(NCYCLES = 20000), verbose = FALSE)
 extract.mirt(graded2, "AIC")
