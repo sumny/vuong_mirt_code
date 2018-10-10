@@ -12,7 +12,7 @@ Non-Nested Item Response Models using Vuong Tests]().
 To inspect the original simulation results, change the working directory in R
 to `vuong_mirt_code/orig`. To rerun the simulations, change it to
 `vuong_mirt_code/repl` as described in `replication.R` and run the code in
-`replication.R`
+`replication.R`.
 
 ### Packages and versions
 * R version 3.4.3
