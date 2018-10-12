@@ -12,7 +12,7 @@ Tests](http://arxiv.org/abs/1810.04734).
 
 To inspect the original simulation results, change the working directory in R
 to `vuong_mirt_code/orig`. To rerun the simulations, change it to
-`vuong_mirt_code/repl. Finally, run the code in `replication.R`.
+`vuong_mirt_code/repl`. Finally, run the code in `replication.R`.
 
 ### Packages and versions
 * R version 3.4.3
