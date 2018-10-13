@@ -14,7 +14,7 @@ require(SimDesign) # version 1.7
 #setwd("~/vuong_mirt_code/orig") # work with the original results
 #setwd("~/vuong_mirt_code/repl") # rerun the simulations
 
-# Last mod: October/10/2018, LS (non-content modifications)
+# Last mod: October/14/2018, LS (non-content modifications)
 
 
 
@@ -224,7 +224,7 @@ legend(0.4, 0.025, c("GRM", "GPCM"), bty = "n", pch = c(19, 19),
 if(length(grep("vuong_mirt_code/orig$", getwd()))) {
   cat("Working with the original simulation result files.\n")
 } else if(length(grep("vuong_mirt_code/repl$", getwd()))) {
-  if("sim_2pl_2dim" %in% dir() | "sim_2pl_2dim-results" %in% dir()) {
+  if("sim_2pl_2dim.rds" %in% dir() | "sim_2pl_2dim-results" %in% dir()) {
     stop("New result files exist. You should inspect them prior to a rerun.\n")
   } else {
     cat("Rerunning the simulation. This may take a very long time.\n")
