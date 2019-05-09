@@ -15,7 +15,9 @@ require(SimDesign) # version 1.13
 #setwd("~/vuong_mirt_code/orig") # work with the original results
 #setwd("~/vuong_mirt_code/repl") # rerun the simulations
 
-# Last mod: March/23/2018, LS (revision updates)
+#the original random seeds being used are available upon request
+
+# Last mod: May/09/2019, LS (revision updates)
 
 
 
