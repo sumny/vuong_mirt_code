@@ -2,27 +2,182 @@
 # Packages and versions, original results or rerun the simulations?
 ###################################################################################################
 
-### for exact results use the versions specified below
+### for exact results the original package versions are needed
 ### figures will only look nice if exported as .eps or .pdf
 
 # R version 3.5.1
-require(MASS) # version 7.3-51.1
-require(mirt) # version 1.29
-require(nonnest2) # version 0.5-2
-require(SimDesign) # version 1.13
+if(version$major != "3" | version$minor !=  "5.1") {
+  warning("R should be version 3.5.1")
+}
+
+# for possible installation of the correct package versions
+if(!requireNamespace("remotes")) install.packages("remotes")
+require(remotes)
+
+# for checking the md5sum
+require(tools)
+
+packages <- c("MASS", "mirt", "nonnest2", "SimDesign")
+versions <- c("7.3-51.1", "1.29", "0.5-2", "1.13")
+packages_missing <- !(sapply(packages, requireNamespace))
+versions_present <- lapply(packages[!packages_missing], packageVersion)
+wrong_versions <- mapply("!=", versions_present, as.list(versions))
+names(wrong_versions) <- packages
+to_be_installed <- which(packages %in% c(names(which(packages_missing)),
+  names(which(wrong_versions))))
+if(sum(to_be_installed)) {
+  cat("Packages missing and/or wrong versions present. Installing...\n")
+  invisible(mapply(install_version, packages[to_be_installed],
+    versions[to_be_installed], repos = "http://cran.us.r-project.org"))
+}
+invisible(sapply(packages, require, character.only = TRUE))
+
+### clean up
+#rm(list = c("packages", "packages_missing", "to_be_installed", "versions",
+#  "versions_present", "wrong_versions"))
 
 ### work with the original results or rerun the simulations?
 #setwd("~/vuong_mirt_code/orig") # work with the original results
 #setwd("~/vuong_mirt_code/repl") # rerun the simulations
 
-#the original random seeds being used are available upon request
+### the original random seeds are available in the "orig" directory
+### and can be used for exact reproduction of results
+### see ?SimDesign::runSimulation and the "load_seed" argument
 
-# Last mod: May/09/2019, LS (revision updates)
+# Last mod: August/07/2019, LS (revision updates)
 
 
 
 ###################################################################################################
 # Simulation 1.1: Code and results or rerun
+###################################################################################################
+
+if(length(grep("vuong_mirt_code/orig$", getwd()))) {
+  cat("Working with the original simulation result files.\n")
+} else if(length(grep("vuong_mirt_code/repl$", getwd()))) {
+  if("sim_2pl_2pl.rds" %in% dir() | "sim_pl_2pl-results" %in% dir()) {
+    stop("New result files exist. You should inspect them prior to a rerun.\n")
+  } else {
+    cat("Rerunning the simulation. This may take a very long time.\n")
+  }
+  ### Settings
+  N <- c(500, 1000, 2000) # persons
+  M <- c(10, 20, 30, 40) # items
+  Design <- expand.grid(N = N, M = M)
+  rm(N, M)
+
+  ### SimDesign functions
+  Generate <- function(condition, fixed_objects = NULL) {
+    Attach(condition)
+    return(simdata(a = rep(1, M), d = rnorm(M, 0, 1),
+      itemtype = rep("2PL", M), Theta = as.matrix(rnorm(N, 0, 1))))
+  }
+
+  Analyse <- function(condition, dat, fixed_objects = NULL) {
+    Attach(condition)
+    ## EM, BFGS, Ramsay, Oakes, 61 quadpts, 1e-4 TOL
+    m1 <- mirt(dat, 1, "2PL", pars = "values")
+    m1$value[m1$name == "a1"][((M / 2) + 1):M] <- 1
+    m1$est[m1$name == "a1"][((M / 2) + 1):M] <- FALSE
+    m1 <- mirt(dat, 1, "2PL", pars = m1,
+      constrain = list(seq(from = 1, by = 4, length.out = M / 2)),
+      SE = TRUE, technical = list(NCYCLES = 5000))
+    m2 <- mirt(dat, 1, "2PL", pars = "values")
+    m2$value[m2$name == "a1"][1:(M / 2)] <- 1
+    m2$est[m2$name == "a1"][1:(M / 2)] <- FALSE
+    m2 <- mirt(dat, 1, "2PL", pars = m2,
+      constrain = list(seq(from = 1 + 4 * (M / 2), by = 4, length.out = M / 2)),
+      SE = TRUE, technical = list(NCYCLES = 5000))
+    return(list(vt = vuongtest(m1, m2),
+      AIC_1 = extract.mirt(m1, "AIC"), AIC_2 = extract.mirt(m2, "AIC"),
+      BIC_1 = extract.mirt(m1, "BIC"), BIC_2 = extract.mirt(m2, "BIC"),
+      M2_1 = M2(m1), M2_2 = M2(m2), m1_check = c(extract.mirt(m1, "converged"),
+      extract.mirt(m1, "condnum"), extract.mirt(m1, "secondordertest")),
+      m2_check = c(extract.mirt(m2, "converged"), extract.mirt(m2, "condnum"),
+      extract.mirt(m2, "secondordertest"))))
+  }
+
+  Summarise <- function(condition, results, fixed_objects = NULL) {
+    return(list(vt_dist = mean(sapply(results, function(x) x$vt$p_omega < 0.05)),
+      vt_1 = mean(sapply(results, function(x) x$vt$p_LRT$A < 0.05)),
+      vt_2 = mean(sapply(results, function(x) x$vt$p_LRT$B < 0.05)),
+      AIC = mean(sapply(results, function(x) (x$AIC_1 - x$AIC_2) < 0)),
+      BIC = mean(sapply(results, function(x) (x$BIC_1 - x$BIC_2) < 0)),
+      M2_1 = mean(sapply(results, function(x) x$M2_1$p < 0.05)),
+      M2_2 = mean(sapply(results, function(x) x$M2_2$p < 0.05)),
+      m1_cn = mean(sapply(results, function(x) x$m1_check[1])),
+      m1_so = mean(sapply(results, function(x) x$m1_check[3])),
+      m2_cn = mean(sapply(results, function(x) x$m2_check[1])),
+      m2_so = mean(sapply(results, function(x) x$m2_check[3]))))
+  }
+
+  ### Run
+  results <- runSimulation(Design, replications = 1000,
+    generate = Generate, analyse = Analyse, summarise = Summarise,
+    packages = c("mirt", "nonnest2"), save = TRUE, save_results = TRUE,
+    save_seeds = FALSE, parallel = TRUE, progress = TRUE, verbose = FALSE,
+    filename = "sim_2pl_2pl",
+    save_details = list(save_results_dirname = "sim_2pl_2pl-results"))
+
+  ### clean up
+  #rm(list = c("Analyse", "Design", "Generate", "results", "Summarise"))
+} else {
+  stop("Please set the working directory as described above.\n")
+}
+
+
+
+###################################################################################################
+# Simulation 1.1: Table 1, Figure 1 and text results
+###################################################################################################
+
+res11 <- readRDS("sim_2pl_2pl.rds")
+#attributes(res11)
+
+### check convergence
+min(res11$m1_cn) # 1
+min(res11$m2_cn) # 1
+min(res11$m1_so) # 1
+min(res11$m2_so) # 1
+res11$AIC_m1 <- res11$AIC
+res11$AIC_m2 <- 1 - res11$AIC
+results11 <- res11[, c(1:13, 18, 19)]
+
+### vt_m1 / vt_m2 only if vt_dist significant
+lrt_v_ds <- t(sapply(1:dim(res11)[1], function(i) {
+  pth <- gsub("-i", paste0("-", i), "sim_2pl_2pl-results/results-row-i.rds")
+  temp <- readRDS(pth)
+  dist <- which(sapply(temp[[2]], function(x) x$vt$p_omega < 0.05))
+  vt_m1 <- mean(sapply(temp[[2]][dist], function(x) x$vt$p_LRT$A) < 0.05)
+  vt_m2 <- mean(sapply(temp[[2]][dist], function(x) x$vt$p_LRT$B) < 0.05)
+  c(vt_m1, vt_m2)
+}))
+rownames(lrt_v_ds) <- results11$N
+colnames(lrt_v_ds) <- c("vt_m1", "vt_m2")
+results11$vt_m1_ds <- lrt_v_ds[, 1]
+results11$vt_m2_ds <- lrt_v_ds[, 2]
+
+temp <- readRDS("sim_2pl_2pl-results/results-row-3.rds")
+
+#setEPS()
+#postscript("../figure1.eps", width = 3, height = 2.4, pointsize = 10)
+#pdf("../figure1.pdf", width = 3, height = 2.4, pointsize = 10)
+
+par(mai = c(0.45, 0.45, 0.1, 0.1), mgp = c(2.7, 0.7, 0), lwd = 1)
+layout(matrix(c(1, 1, 1, 1), 1, 4))
+hist(sapply(temp[[2]], function(x) x$vt$p_omega), main = "", xlab = expression(italic(p)[Dist]),
+  col = "darkgrey")
+box(bty = "L")
+
+#dev.off()
+
+### clean up
+#rm(list = c("lrt_v_ds", "res11", "results11", "temp"))
+
+
+
+###################################################################################################
+# Simulation A.1: Code and results or rerun
 ###################################################################################################
 
 if(length(grep("vuong_mirt_code/orig$", getwd()))) {
@@ -97,64 +252,64 @@ if(length(grep("vuong_mirt_code/orig$", getwd()))) {
 
 
 ###################################################################################################
-# Simulation 1.1: Table 1, Figure 1 and text results
+# Simulation A.1: Table A1, Figure A1 and text results
 ###################################################################################################
 
-res11 <- readRDS("sim_graded_gpcm_base.rds")
-#attributes(res11)
+resA1 <- readRDS("sim_graded_gpcm_base.rds")
+#attributes(resA1)
 
 ### check convergence
-min(res11$graded_cn) # 0.924
-min(res11$gpcm_cn)   # 0.901
-min(res11$graded_so) # 1
-min(res11$gpcm_so)   # 1
-res11$AIC_graded <- res11$AIC
-res11$AIC_gpcm <- 1 - res11$AIC
-results11 <- res11[, 1:14]
-results11 <- cbind(results11, "AIC_graded" = res11$AIC_graded, "AIC_gpcm" = res11$AIC_gpcm)
+min(resA1$graded_cn) # 0.924
+min(resA1$gpcm_cn)   # 0.901
+min(resA1$graded_so) # 1
+min(resA1$gpcm_so)   # 1
+resA1$AIC_graded <- resA1$AIC
+resA1$AIC_gpcm <- 1 - resA1$AIC
+resultsA1 <- resA1[, 1:14]
+resultsA1 <- cbind(resultsA1, "AIC_graded" = resA1$AIC_graded, "AIC_gpcm" = resA1$AIC_gpcm)
 
 ### results of replications in which both models converged
-res11_oc <- res11
-res11_oc$cn_both <- NULL
+resA1_oc <- resA1
+resA1_oc$cn_both <- NULL
 AIC_results <- list()
-for(i in 1:dim(res11_oc)[1]) {
+for(i in 1:dim(resA1_oc)[1]) {
   pth <- gsub("-i", paste0("-", i), "sim_graded_gpcm_base-results/results-row-i.rds")
   temp <- readRDS(pth)
   cn <- which(sapply(temp[[2]], function(x) x$graded_check[1] == 1 & x$gpcm_check[1] == 1))
-  res11_oc$cn_both[i] <- length(cn) / length(temp[[2]])
+  resA1_oc$cn_both[i] <- length(cn) / length(temp[[2]])
   ## vt_dist
-  res11_oc[i, 4] <- mean(sapply(temp[[2]], function(x) x$vt$p_omega)[cn] < 0.05)
+  resA1_oc[i, 4] <- mean(sapply(temp[[2]], function(x) x$vt$p_omega)[cn] < 0.05)
   ## vt_graded
-  res11_oc[i, 5] <- mean(sapply(temp[[2]], function(x) x$vt$p_LRT$A)[cn] < 0.05)
+  resA1_oc[i, 5] <- mean(sapply(temp[[2]], function(x) x$vt$p_LRT$A)[cn] < 0.05)
   ## vt_gpcm
-  res11_oc[i, 6] <- mean(sapply(temp[[2]], function(x) x$vt$p_LRT$B)[cn] < 0.05)
+  resA1_oc[i, 6] <- mean(sapply(temp[[2]], function(x) x$vt$p_LRT$B)[cn] < 0.05)
   ## AIC
-  res11_oc[i, 7] <- mean(sapply(temp[[2]], function(x) (x$AIC_graded - x$AIC_gpcm) < 0)[cn])
+  resA1_oc[i, 7] <- mean(sapply(temp[[2]], function(x) (x$AIC_graded - x$AIC_gpcm) < 0)[cn])
   AIC_results[[i]] <- summary(sapply(temp[[2]], function(x) abs(x$AIC_graded - x$AIC_gpcm)))
   ## BIC
-  res11_oc[i, 8] <- mean(sapply(temp[[2]], function(x) (x$BIC_graded - x$BIC_gpcm) < 0)[cn])
+  resA1_oc[i, 8] <- mean(sapply(temp[[2]], function(x) (x$BIC_graded - x$BIC_gpcm) < 0)[cn])
   ## M2_graded
-  res11_oc[i, 9] <- mean(sapply(temp[[2]], function(x) x$M2_graded$p)[cn] < 0.05)
+  resA1_oc[i, 9] <- mean(sapply(temp[[2]], function(x) x$M2_graded$p)[cn] < 0.05)
   ## M2_gpcm
-  res11_oc[i, 10] <- mean(sapply(temp[[2]], function(x) x$M2_gpcm$p)[cn] < 0.05)
+  resA1_oc[i, 10] <- mean(sapply(temp[[2]], function(x) x$M2_gpcm$p)[cn] < 0.05)
   ## graded_cn
-  res11_oc[i, 11] <- mean(sapply(temp[[2]], function(x) x$graded_check[1] == 1)[cn])
+  resA1_oc[i, 11] <- mean(sapply(temp[[2]], function(x) x$graded_check[1] == 1)[cn])
   ## graded_so
-  res11_oc[i, 12] <- mean(sapply(temp[[2]], function(x) x$graded_check[3] == 1)[cn])
+  resA1_oc[i, 12] <- mean(sapply(temp[[2]], function(x) x$graded_check[3] == 1)[cn])
   ## gpcm_cn
-  res11_oc[i, 13] <- mean(sapply(temp[[2]], function(x) x$graded_check[1] == 1)[cn])
+  resA1_oc[i, 13] <- mean(sapply(temp[[2]], function(x) x$graded_check[1] == 1)[cn])
   ## gpcm_so
-  res11_oc[i, 14] <- mean(sapply(temp[[2]], function(x) x$graded_check[3] == 1)[cn])
+  resA1_oc[i, 14] <- mean(sapply(temp[[2]], function(x) x$graded_check[3] == 1)[cn])
 }
-res11_oc$AIC_graded <- res11_oc$AIC
-res11_oc$AIC_gpcm <- 1 - res11_oc$AIC
-results11_oc <- res11_oc[, 1:14]
-results11_oc <- cbind(results11_oc, "AIC_graded" = res11_oc$AIC_graded,
-  "AIC_gpcm" = res11_oc$AIC_gpcm, "cn_both" = res11_oc$cn_both)
-which.min(results11_oc$cn_both) # 1 N = 500
+resA1_oc$AIC_graded <- resA1_oc$AIC
+resA1_oc$AIC_gpcm <- 1 - resA1_oc$AIC
+resultsA1_oc <- resA1_oc[, 1:14]
+resultsA1_oc <- cbind(resultsA1_oc, "AIC_graded" = resA1_oc$AIC_graded,
+  "AIC_gpcm" = resA1_oc$AIC_gpcm, "cn_both" = resA1_oc$cn_both)
+which.min(resultsA1_oc$cn_both) # 1 N = 500
 
 ### vt_graded / vt_gpcm only if vt_dist significant
-lrt_v_ds <- t(sapply(1:dim(res11_oc)[1], function(i) {
+lrt_v_ds <- t(sapply(1:dim(resA1_oc)[1], function(i) {
   pth <- gsub("-i", paste0("-", i), "sim_graded_gpcm_base-results/results-row-i.rds")
   temp <- readRDS(pth)
   cn <- which(sapply(temp[[2]], function(x) x$graded_check[1] == 1 & x$gpcm_check[1] == 1))
@@ -163,32 +318,32 @@ lrt_v_ds <- t(sapply(1:dim(res11_oc)[1], function(i) {
   vt_gpcm <- mean(sapply(temp[[2]][dist], function(x) x$vt$p_LRT$B) < 0.05)
   c(vt_graded, vt_gpcm)
 }))
-rownames(lrt_v_ds) <- results11_oc$N
+rownames(lrt_v_ds) <- resultsA1_oc$N
 colnames(lrt_v_ds) <- c("vt_graded", "vt_gpcm")
-results11_oc$vt_graded_ds <- lrt_v_ds[, 1]
-results11_oc$vt_gpcm_ds <- lrt_v_ds[, 2]
+resultsA1_oc$vt_graded_ds <- lrt_v_ds[, 1]
+resultsA1_oc$vt_gpcm_ds <- lrt_v_ds[, 2]
 
 ### absolute differences in AIC values
 temp <- readRDS("sim_graded_gpcm_base-results/results-row-1.rds")
 cn <- which(sapply(temp[[2]], function(x) x$graded_check[1] == 1 & x$gpcm_check[1] == 1))
-abs_aic11_1 <- sapply(temp[[2]], function(x) abs(x$AIC_graded - x$AIC_gpcm))[cn]
+abs_aicA1_1 <- sapply(temp[[2]], function(x) abs(x$AIC_graded - x$AIC_gpcm))[cn]
 
 #setEPS()
-#postscript("../figure1.eps", width = 4.5, height = 2.4, pointsize = 10)
-#pdf("../figure1.pdf", width = 4.5, height = 2.4, pointsize = 10)
+#postscript("../figureA1.eps", width = 4.5, height = 2.4, pointsize = 10)
+#pdf("../figureA1.pdf", width = 4.5, height = 2.4, pointsize = 10)
 
 par(mai = c(0.45, 0.45, 0.1, 0.1), mgp = c(2.7, 0.7, 0), lwd = 1)
 layout(matrix(c(1, 2, 2), 1, 3))
-boxplot(abs_aic11_1, ylab = expression(paste("|", Delta["AIC"], "|")), ylim = c(0, 8))
-hist(abs_aic11_1, ylab = "Frequency", xlab = expression(paste("|", Delta["AIC"], "|")), main = "",
+boxplot(abs_aicA1_1, ylab = expression(paste("|", Delta["AIC"], "|")), ylim = c(0, 8))
+hist(abs_aicA1_1, ylab = "Frequency", xlab = expression(paste("|", Delta["AIC"], "|")), main = "",
   ylim = c(0, 400), col = "darkgrey")
 box(bty = "L")
 
 #dev.off()
 
 ### clean up
-#rm(list = c("abs_aic11_1", "AIC_results", "cn", "i", "lrt_v_ds", "pth", "res11", "res11_oc",
-#  "results11", "results11_oc", "temp"))
+#rm(list = c("abs_aicA1_1", "AIC_results", "cn", "i", "lrt_v_ds", "pth", "resA1", "resA1_oc",
+#  "resultsA1", "resultsA1_oc", "temp"))
 
 
 
@@ -496,6 +651,7 @@ if(length(grep("vuong_mirt_code/orig$", getwd()))) {
 ###################################################################################################
 
 res21 <- readRDS("sim_rm_2pl_mis.rds")
+#attributes(res21)
 
 ### check convergence
 min(res21$m1_cn) # 1
@@ -610,6 +766,7 @@ if(length(grep("vuong_mirt_code/orig$", getwd()))) {
 ###################################################################################################
 
 res22 <- readRDS("sim_2pl_2dim.rds")
+#attributes(res22)
 
 ### check convergence
 min(res22$m1_cn) # 1
@@ -755,8 +912,6 @@ legend(0.42, 0.025, c("2PL", "2d-2PL"), bty = "n", pch = c(19, 19),
 ###################################################################################################
 # Application: The Nerdy Personality Attributes Scale
 ###################################################################################################
-
-require(tools) # for checking the md5sum
 
 ### data from the Open Source Psychometrics Project
 temp <- tempfile()
