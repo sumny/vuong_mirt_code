@@ -6,7 +6,7 @@
 ### figures will only look nice if exported as .eps or .pdf
 
 # R version 3.5.1
-if(version$major != "3" | version$minor !=  "5.1") {
+if(version$major != "3" | version$minor != "5.1") {
   warning("R should be version 3.5.1")
 }
 
@@ -17,6 +17,7 @@ require(remotes)
 # for checking the md5sum
 require(tools)
 
+# check the package versions and install the correct ones if necessary
 packages <- c("MASS", "mirt", "nonnest2", "SimDesign")
 versions <- c("7.3-51.1", "1.29", "0.5-2", "1.13")
 packages_missing <- !(sapply(packages, requireNamespace))
@@ -44,7 +45,7 @@ invisible(sapply(packages, require, character.only = TRUE))
 ### and can be used for exact reproduction of results
 ### see ?SimDesign::runSimulation and the "load_seed" argument
 
-# Last mod: August/07/2019, LS (revision updates)
+# Last mod: September/19/2019, LS (added more comments)
 
 
 
@@ -583,7 +584,7 @@ if(length(grep("vuong_mirt_code/orig$", getwd()))) {
   ### Settings
   N <- c(500, 1000, 2000) # persons
   M <- c(10, 20, 30, 40) # items
-  g <- c("RM", "2PL", 0.01, 0.05, 0.25) # guessing parameter
+  g <- c("RM", "2PL", 0.01, 0.05, 0.25) # RM, 2PL or guessing parameter
   Design <- expand.grid(N = N, M = M, g = g)
   rm(N, M, g)
 
