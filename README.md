@@ -4,7 +4,7 @@ This repository contains simulation code and results as well as other code to
 replicate all findings reported in the paper [Model Selection of Nested and
 Non-Nested Item Response Models using Vuong
 Tests](https://doi.org/10.1080/00273171.2019.1664280)
-([arXiv preprint]((http://arxiv.org/abs/1810.04734)).
+([arXiv preprint](http://arxiv.org/abs/1810.04734)).
 
 ### Contents and getting started
 * orig (directory containing the original simulation results)
